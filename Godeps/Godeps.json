@@ -2,10 +2,12 @@
 	"ImportPath": "personal-website-backend",
 	"GoVersion": "go1.14",
 	"GodepVersion": "v80",
-	"Packages": [
-		"./..."
-	],
 	"Deps": [
+		{
+			"ImportPath": "github.com/buger/jsonparser",
+			"Comment": "v1.0.0-1-g69104e2",
+			"Rev": "69104e2c5db4eb0029dab60d2f180db11bf7e5a7"
+		},
 		{
 			"ImportPath": "github.com/gorilla/mux",
 			"Comment": "v1.7.4-1-g948bec3",
