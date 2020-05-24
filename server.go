@@ -46,5 +46,5 @@ func main() {
 	router.HandleFunc("/", root).Methods("GET")
 	// start server and listen on port
 	log.Println("Listening!")
-	log.Fatal(http.ListenAndServe(os.Getenv("PORT"), router))
+	log.Fatal(http.ListenAndServe(":"+os.Getenv("PORT"), router))
 }
