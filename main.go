@@ -22,6 +22,8 @@ var client = &http.Client{
 	Timeout: time.Second * 10,
 }
 
+const gitHubRepoURL = "https://api.github.com/user/repos?visibility=public&affiliation=owner"
+
 // struct for storing repository data retrieved from API requests
 type repoStruct struct {
 	Name        string       `json:"name"`
@@ -38,6 +40,13 @@ type repoStruct struct {
 type cloneSources struct {
 	HTTP string `json:"http_clone"`
 	SSH  string `json:"ssh_clone"`
+}
+
+type ghStats struct {
+	LangUse          map[string]int `json:"language_use"`
+	TotalPublicRepos int            `json:"total_repos"`
+	TotalStars       int            `json:"total_stars"`
+	TotalForks       int            `json:"total_forks"`
 }
 
 /*
@@ -61,23 +70,32 @@ func root(writer http.ResponseWriter, r *http.Request) {
 }
 
 /*
-	Return formatted information about all my current public repos.
-	This uses the GitHub API
+	Grab repo details from GitHub and parse reponse body
 */
-func repos(writer http.ResponseWriter, r *http.Request) {
-	req, err := http.NewRequest("GET", "https://api.github.com/user/repos?visibility=public&affiliation=owner", nil)
+func getRepos() (body []byte) {
+	req, err := http.NewRequest("GET", gitHubRepoURL, nil)
 	if err != nil {
 		log.Fatalf("Error generating get repo request: %+v", err)
 	}
 
 	req.Header.Set("Authorization", "Token "+os.Getenv("GITHUB_API_TOKEN")) // set GH auth header
-	writer.Header().Set("Content-Type", "application/json")
 
 	response, err := client.Do(req)
+	defer response.Body.Close()
 	if err != nil {
 		log.Fatalf("Error making get repo request: %+v", err.Error())
 	}
-	body, err := ioutil.ReadAll(response.Body)
+	parsedBody, _ := ioutil.ReadAll(response.Body)
+	return parsedBody
+}
+
+/*
+	Return formatted information about all my current public repos.
+	This uses the GitHub API
+*/
+func repos(writer http.ResponseWriter, r *http.Request) {
+	body := getRepos()
+	writer.Header().Set("Content-Type", "application/json")
 
 	// construct custom repo struct for every repo returned from API and append to slice
 	repoStructArr := []repoStruct{}
@@ -116,6 +134,49 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(writer, string(formatted))
 }
 
+/*
+	Provide stats about used languages and other such numbers from my public GitHub repositories
+*/
+func repoStats(writer http.ResponseWriter, r *http.Request) {
+	body := getRepos()
+	writer.Header().Set("Content-Type", "application/json")
+
+	// map of: <language name: x><occurrences of x as dominant language in public repos>
+	langMap := make(map[string]int)
+
+	var totalForks, totalStars, total int
+
+	js.ArrayEach(body, func(value []byte, dataType js.ValueType, offset int, err error) {
+		language, _ := js.GetString(value, "language")
+		stars, _ := js.GetInt(value, "stargazers_count")
+		forks, _ := js.GetInt(value, "forks_count")
+
+		total++
+		totalForks += int(forks)
+		totalStars += int(stars)
+		// if language already seen, increment its value, else initialise its value to 1
+		if _, ok := langMap[language]; ok {
+			langMap[language]++
+		} else {
+			langMap[language] = 1
+		}
+
+	})
+
+	stats := ghStats{
+		LangUse:          langMap,
+		TotalPublicRepos: total,
+		TotalForks:       totalForks,
+		TotalStars:       totalStars,
+	}
+
+	formatted, err := json.Marshal(stats)
+	if err != nil {
+		log.Fatalf("Error marshalling repo stat map: %+v", err.Error())
+	}
+	fmt.Fprintf(writer, string(formatted))
+}
+
 func init() {
 	// load environment variables
 	if err := godotenv.Load(); err != nil {
@@ -126,8 +187,13 @@ func init() {
 func main() {
 	const base = "/api"
 	router := mux.NewRouter().StrictSlash(true) // create new Mux router
+
+	// root of server
 	router.HandleFunc("/", root).Methods("GET")
+
+	// GitHub routes
 	router.HandleFunc(base+"/github/repos", repos).Methods("GET")
+	router.HandleFunc(base+"/github/repo-stats", repoStats).Methods("GET")
 
 	// start server and listen on port
 	log.Println("Listening!")
