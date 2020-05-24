@@ -24,9 +24,20 @@ var client = &http.Client{
 
 // struct for storing repository data retrieved from API requests
 type repoStruct struct {
-	Name        string `json:"name"`
-	Description string `json:"desc"`
-	URL         string `json:"url"`
+	Name        string       `json:"name"`
+	Description string       `json:"desc"`
+	URL         string       `json:"url"`
+	Stars       int          `json:"stars"`
+	Forks       int          `json:"forks"`
+	Language    string       `json:"lang"`
+	Archived    bool         `json:"archived"`
+	Clones      cloneSources `json:"clones"`
+}
+
+// storing the different ways the repositories can be cloned locally
+type cloneSources struct {
+	HTTP string `json:"http_clone"`
+	SSH  string `json:"ssh_clone"`
 }
 
 /*
@@ -49,7 +60,10 @@ func root(writer http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(writer, data)
 }
 
-// get, format and return my current public repositorties
+/*
+	Return formatted information about all my current public repos.
+	This uses the GitHub API
+*/
 func repos(writer http.ResponseWriter, r *http.Request) {
 	req, err := http.NewRequest("GET", "https://api.github.com/user/repos?visibility=public&affiliation=owner", nil)
 	if err != nil {
@@ -71,11 +85,25 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 		name, _ := js.GetString(value, "name")
 		desc, _ := js.GetString(value, "description")
 		url, _ := js.GetString(value, "html_url")
+		httpClone, _ := js.GetString(value, "clone_url")
+		sshClone, _ := js.GetString(value, "ssh_url")
+		stars, _ := js.GetInt(value, "stargazers_count")
+		forks, _ := js.GetInt(value, "forks_count")
+		language, _ := js.GetString(value, "language")
+		archived, _ := js.GetBoolean(value, "archived")
 
 		tmpRepo := repoStruct{
 			Name:        name,
 			Description: desc,
 			URL:         url,
+			Stars:       int(stars),
+			Forks:       int(forks),
+			Language:    language,
+			Archived:    archived,
+			Clones: cloneSources{
+				HTTP: httpClone,
+				SSH:  sshClone,
+			},
 		}
 		repoStructArr = append(repoStructArr, tmpRepo)
 	})
@@ -86,23 +114,6 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 		log.Fatalf("Error marshalling repo data: %+v", err.Error())
 	}
 	fmt.Fprintf(writer, string(formatted))
-}
-
-func data(writer http.ResponseWriter, r *http.Request) {
-	req, err := http.NewRequest("GET", "https://api.github.com/user", nil)
-	if err != nil {
-		log.Fatalf("Error generating request: %+v", err)
-	}
-
-	req.Header.Set("Authorization", "Token "+os.Getenv("GITHUB_API_TOKEN")) // set GH auth header
-	writer.Header().Set("Content-Type", "application/json")
-	response, err := client.Do(req)
-	if err != nil {
-		log.Fatalf("Error making request: %+v", err.Error())
-	}
-
-	body, err := ioutil.ReadAll(response.Body)
-	fmt.Fprintf(writer, string(body))
 }
 
 func init() {
@@ -116,7 +127,6 @@ func main() {
 	const base = "/api"
 	router := mux.NewRouter().StrictSlash(true) // create new Mux router
 	router.HandleFunc("/", root).Methods("GET")
-	router.HandleFunc(base+"/data", data).Methods("GET")
 	router.HandleFunc(base+"/github/repos", repos).Methods("GET")
 
 	// start server and listen on port
