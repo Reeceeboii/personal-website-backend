@@ -1,0 +1,20 @@
+{
+	"ImportPath": "personal-website-backend",
+	"GoVersion": "go1.14",
+	"GodepVersion": "v80",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Comment": "v1.7.4-1-g948bec3",
+			"Rev": "948bec34b5168796bf3fc4dbb09215baa970351a"
+		},
+		{
+			"ImportPath": "github.com/joho/godotenv",
+			"Comment": "v1.3.0-14-gd6ee687",
+			"Rev": "d6ee6871f21dd95e76563a90f522ce9fe75443f8"
+		}
+	]
+}

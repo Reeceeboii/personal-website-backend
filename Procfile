@@ -1,1 +1,1 @@
-web: bin/personal-website-backend
+web: personal-website-backend
