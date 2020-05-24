@@ -8,8 +8,10 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/Reeceeboii/personal-website-backend"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 // create a new HTTP client so we can send outbound HTTP requests
@@ -41,8 +43,29 @@ func init() {
 	}
 }
 
+// @title Swagger Example API
+// @version 1.0
+// @description This is a sample server Petstore server.
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host petstore.swagger.io
+// @BasePath /v2
 func main() {
 	router := mux.NewRouter().StrictSlash(true) // create new Mux router
+	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
+		httpSwagger.URL("http://localhost:5000/swagger/doc.json"), //The url pointing to API definition
+		httpSwagger.DeepLinking(true),
+		httpSwagger.DocExpansion("none"),
+		httpSwagger.DomID("#swagger-ui"),
+	))
+
 	router.HandleFunc("/", root).Methods("GET")
 	// start server and listen on port
 	log.Println("Listening!")
