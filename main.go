@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -14,13 +15,21 @@ import (
 	js "github.com/buger/jsonparser"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+
+	// aws
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-// create a new HTTP client so we can send outbound HTTP requests
-var client = &http.Client{
-	// 10 second timeout stops silent failures if any external endpoints never respond
-	Timeout: time.Second * 10,
-}
+// HTTP client for outbound requests
+var client *http.Client
+
+// AWS session
+var awsSesh *session.Session
+
+// S3 specific session
+var s3svc *s3.S3
 
 const gitHubRepoURL = "https://api.github.com/user/repos?visibility=public&affiliation=owner"
 
@@ -81,10 +90,10 @@ func getRepos() (body []byte) {
 	req.Header.Set("Authorization", "Token "+os.Getenv("GITHUB_API_TOKEN")) // set GH auth header
 
 	response, err := client.Do(req)
-	defer response.Body.Close()
 	if err != nil {
 		log.Fatalf("Error making get repo request: %+v", err.Error())
 	}
+	defer response.Body.Close()
 	parsedBody, _ := ioutil.ReadAll(response.Body)
 	return parsedBody
 }
@@ -154,7 +163,7 @@ func repoStats(writer http.ResponseWriter, r *http.Request) {
 		total++
 		totalForks += int(forks)
 		totalStars += int(stars)
-		// if language already seen, increment its value, else initialise its value to 1
+		// if key already seen, increment its value, else initialise its value to 1
 		if _, ok := langMap[language]; ok {
 			langMap[language]++
 		} else {
@@ -176,11 +185,26 @@ func repoStats(writer http.ResponseWriter, r *http.Request) {
 	gz.Close()
 }
 
+// do some setup before server spins up
 func init() {
 	// load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No env")
 	}
+
+	// setup HTTP client
+	client = &http.Client{
+		// 10 second timeout stops silent failures if any external endpoints never respond
+		Timeout: time.Second * 10,
+	}
+
+	// create a new AWS session
+	awsSesh, _ = session.NewSession(&aws.Config{
+		Region: aws.String(os.Getenv("AWS_REGION")),
+	})
+
+	// create a new S3 specific session
+	s3svc = s3.New(awsSesh)
 }
 
 func main() {
@@ -194,6 +218,18 @@ func main() {
 	router.HandleFunc(base+"/github/repos", repos).Methods("GET")
 	router.HandleFunc(base+"/github/repo-stats", repoStats).Methods("GET")
 
+	bucket := os.Getenv("AWS_BUCKET_NAME")
+	resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: &bucket})
+	if err != nil {
+		log.Fatalf("Error listing items: %+v", err.Error())
+	}
+	for _, item := range resp.Contents {
+		fmt.Println("Name:         ", *item.Key)
+		fmt.Println("Last modified:", *item.LastModified)
+		fmt.Println("Size:         ", *item.Size)
+		fmt.Println("Storage class:", *item.StorageClass)
+		fmt.Println("")
+	}
 	// start server and listen on port
 	log.Println("Listening!")
 	log.Fatal(http.ListenAndServe(":"+os.Getenv("PORT"), router))
