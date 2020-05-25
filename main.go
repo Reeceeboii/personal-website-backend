@@ -3,13 +3,12 @@ package main
 import (
 	"compress/gzip"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
+	"strings"
 	"time"
 
 	js "github.com/buger/jsonparser"
@@ -33,31 +32,6 @@ var s3svc *s3.S3
 
 const gitHubRepoURL = "https://api.github.com/user/repos?visibility=public&affiliation=owner"
 
-// struct for storing repository data retrieved from API requests
-type repoStruct struct {
-	Name        string       `json:"name"`
-	Description string       `json:"desc"`
-	URL         string       `json:"url"`
-	Stars       int          `json:"stars"`
-	Forks       int          `json:"forks"`
-	Language    string       `json:"lang"`
-	Archived    bool         `json:"archived"`
-	Clones      cloneSources `json:"clones"`
-}
-
-// storing the different ways the repositories can be cloned locally
-type cloneSources struct {
-	HTTP string `json:"http_clone"`
-	SSH  string `json:"ssh_clone"`
-}
-
-type ghStats struct {
-	LangUse          map[string]int `json:"language_use"`
-	TotalPublicRepos int            `json:"total_repos"`
-	TotalStars       int            `json:"total_stars"`
-	TotalForks       int            `json:"total_forks"`
-}
-
 /*
 	Generate the root HTML for any requests that land there. // TODO this needs to be updated when I get a minute.
 	At the minute it's just an (almost) direct port from my current backend.
@@ -67,15 +41,9 @@ func root(writer http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatalf("Error creating template: %+v", err)
 	}
-	date := time.Now().Month().String() + " " + strconv.Itoa(time.Now().Day()) + " " + strconv.Itoa(time.Now().Year())
-	data := struct {
-		Time string
-		Path string
-	}{
-		Time: date,
-		Path: r.URL.Path,
-	}
-	tmpl.Execute(writer, data)
+	type data struct{}
+
+	tmpl.Execute(writer, data{})
 }
 
 /*
@@ -108,7 +76,7 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 	writer.Header().Set("Content-Encoding", "gzip")
 
 	// construct custom repo struct for every repo returned from API and append to slice
-	repoStructArr := []repoStruct{}
+	repoStructSlice := []RepoStruct{}
 	js.ArrayEach(body, func(value []byte, dataType js.ValueType, offset int, err error) {
 		name, _ := js.GetString(value, "name")
 		desc, _ := js.GetString(value, "description")
@@ -120,7 +88,7 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 		language, _ := js.GetString(value, "language")
 		archived, _ := js.GetBoolean(value, "archived")
 
-		tmpRepo := repoStruct{
+		tmpRepo := RepoStruct{
 			Name:        name,
 			Description: desc,
 			URL:         url,
@@ -128,17 +96,17 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 			Forks:       int(forks),
 			Language:    language,
 			Archived:    archived,
-			Clones: cloneSources{
+			Clones: CloneSources{
 				HTTP: httpClone,
 				SSH:  sshClone,
 			},
 		}
-		repoStructArr = append(repoStructArr, tmpRepo)
+		repoStructSlice = append(repoStructSlice, tmpRepo)
 	})
 
 	// gzip and send
 	gz := gzip.NewWriter(writer)
-	json.NewEncoder(gz).Encode(repoStructArr)
+	json.NewEncoder(gz).Encode(repoStructSlice)
 	gz.Close()
 }
 
@@ -169,10 +137,9 @@ func repoStats(writer http.ResponseWriter, r *http.Request) {
 		} else {
 			langMap[language] = 1
 		}
-
 	})
 
-	stats := ghStats{
+	stats := GHStats{
 		LangUse:          langMap,
 		TotalPublicRepos: total,
 		TotalForks:       totalForks,
@@ -183,6 +150,55 @@ func repoStats(writer http.ResponseWriter, r *http.Request) {
 	gz := gzip.NewWriter(writer)
 	json.NewEncoder(gz).Encode(stats)
 	gz.Close()
+}
+
+func listCollections(writer http.ResponseWriter, r *http.Request) {
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Header().Set("Content-Encoding", "gzip")
+
+	bucket := os.Getenv("AWS_BUCKET_NAME")
+	resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: &bucket})
+	if err != nil {
+		log.Fatalf("Error listing items: %+v", err.Error())
+	}
+
+	var collectionsSlice []Collection
+	// format each collection (folder i.e. has size of zero) and append to slice
+	for _, item := range resp.Contents {
+		var description string
+		if *item.Size == 0 {
+			if req, err := http.NewRequest("GET", formatPublicURL(strings.TrimSuffix(*item.Key, "/")+"/desc.json"), nil); err != nil {
+				log.Fatalf("Error generating collection description get request: %+v", err)
+			} else {
+				if response, err := client.Do(req); err != nil {
+					log.Fatalf("Error doing collection description get request: %+v", err)
+				} else {
+					defer response.Body.Close()
+					parsed, _ := ioutil.ReadAll(response.Body)
+					description, _ = js.GetString(parsed, "desc")
+				}
+			}
+
+			tempCollection := Collection{
+				Key:         strings.TrimSuffix(*item.Key, "/"),
+				Created:     item.LastModified.Format("January 02, 2006"),
+				Description: description,
+			}
+			collectionsSlice = append(collectionsSlice, tempCollection)
+			formatPublicURL(strings.TrimSuffix(*item.Key, "/"))
+		}
+	}
+
+	// gzip and send
+	gz := gzip.NewWriter(writer)
+	json.NewEncoder(gz).Encode(collectionsSlice)
+	gz.Close()
+
+}
+
+// plug in S3 info and a key to create a publicly accessible URL for an S3 resource
+func formatPublicURL(key string) string {
+	return "https://s3." + os.Getenv("AWS_REGION") + ".amazonaws.com/" + os.Getenv("AWS_BUCKET_NAME") + "/" + key
 }
 
 // do some setup before server spins up
@@ -218,18 +234,9 @@ func main() {
 	router.HandleFunc(base+"/github/repos", repos).Methods("GET")
 	router.HandleFunc(base+"/github/repo-stats", repoStats).Methods("GET")
 
-	bucket := os.Getenv("AWS_BUCKET_NAME")
-	resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: &bucket})
-	if err != nil {
-		log.Fatalf("Error listing items: %+v", err.Error())
-	}
-	for _, item := range resp.Contents {
-		fmt.Println("Name:         ", *item.Key)
-		fmt.Println("Last modified:", *item.LastModified)
-		fmt.Println("Size:         ", *item.Size)
-		fmt.Println("Storage class:", *item.StorageClass)
-		fmt.Println("")
-	}
+	// photography routes
+	router.HandleFunc(base+"/photography/list-collections", listCollections).Methods("GET")
+
 	// start server and listen on port
 	log.Println("Listening!")
 	log.Fatal(http.ListenAndServe(":"+os.Getenv("PORT"), router))
