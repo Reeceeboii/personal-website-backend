@@ -33,8 +33,8 @@ var s3svc *s3.S3
 const gitHubRepoURL = "https://api.github.com/user/repos?visibility=public&affiliation=owner"
 
 /*
-	Generate the root HTML for any requests that land there. // TODO this needs to be updated when I get a minute.
-	At the minute it's just an (almost) direct port from my current backend.
+   Generate the root HTML for any requests that land there. // TODO this needs to be updated when I get a minute.
+   At the minute it's just an (almost) direct port from my current backend.
 */
 func root(writer http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles("root.gohtml")
@@ -47,7 +47,7 @@ func root(writer http.ResponseWriter, r *http.Request) {
 }
 
 /*
-	Grab repo details from GitHub and parse reponse body
+   Grab repo details from GitHub and parse reponse body
 */
 func getRepos() (body []byte) {
 	req, err := http.NewRequest("GET", gitHubRepoURL, nil)
@@ -67,8 +67,8 @@ func getRepos() (body []byte) {
 }
 
 /*
-	Return formatted information about all my current public repos.
-	This uses the GitHub API
+   Return formatted information about all my current public repos.
+   This uses the GitHub API
 */
 func repos(writer http.ResponseWriter, r *http.Request) {
 	body := getRepos()
@@ -111,7 +111,7 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 }
 
 /*
-	Provide stats about used languages and other such numbers from my public GitHub repositories
+   Provide stats about used languages and other such numbers from my public GitHub repositories
 */
 func repoStats(writer http.ResponseWriter, r *http.Request) {
 	body := getRepos()
