@@ -1,8 +1,8 @@
 package main
 
 import (
+	"compress/gzip"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -96,6 +96,7 @@ func getRepos() (body []byte) {
 func repos(writer http.ResponseWriter, r *http.Request) {
 	body := getRepos()
 	writer.Header().Set("Content-Type", "application/json")
+	writer.Header().Set("Content-Encoding", "gzip")
 
 	// construct custom repo struct for every repo returned from API and append to slice
 	repoStructArr := []repoStruct{}
@@ -126,12 +127,10 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 		repoStructArr = append(repoStructArr, tmpRepo)
 	})
 
-	// marshal struct data to JSON string and return to client
-	formatted, err := json.Marshal(repoStructArr)
-	if err != nil {
-		log.Fatalf("Error marshalling repo data: %+v", err.Error())
-	}
-	fmt.Fprintf(writer, string(formatted))
+	// gzip and send
+	gz := gzip.NewWriter(writer)
+	json.NewEncoder(gz).Encode(repoStructArr)
+	gz.Close()
 }
 
 /*
@@ -140,6 +139,7 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 func repoStats(writer http.ResponseWriter, r *http.Request) {
 	body := getRepos()
 	writer.Header().Set("Content-Type", "application/json")
+	writer.Header().Set("Content-Encoding", "gzip")
 
 	// map of: <language name: x><occurrences of x as dominant language in public repos>
 	langMap := make(map[string]int)
@@ -170,11 +170,10 @@ func repoStats(writer http.ResponseWriter, r *http.Request) {
 		TotalStars:       totalStars,
 	}
 
-	formatted, err := json.Marshal(stats)
-	if err != nil {
-		log.Fatalf("Error marshalling repo stat map: %+v", err.Error())
-	}
-	fmt.Fprintf(writer, string(formatted))
+	// gzip and send
+	gz := gzip.NewWriter(writer)
+	json.NewEncoder(gz).Encode(stats)
+	gz.Close()
 }
 
 func init() {
