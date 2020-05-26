@@ -4,11 +4,9 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	js "github.com/buger/jsonparser"
@@ -37,77 +35,13 @@ const gitHubRepoURL = "https://api.github.com/user/repos?visibility=public&affil
    At the minute it's just an (almost) direct port from my current backend.
 */
 func root(writer http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("root.gohtml")
+	tmpl, err := template.ParseFiles("./views/root.gohtml")
 	if err != nil {
 		log.Fatalf("Error creating template: %+v", err)
 	}
-	type data struct{}
 
-	tmpl.Execute(writer, data{})
-}
-
-/*
-   Grab repo details from GitHub and parse reponse body
-*/
-func getRepos() (body []byte) {
-	req, err := http.NewRequest("GET", gitHubRepoURL, nil)
-	if err != nil {
-		log.Fatalf("Error generating get repo request: %+v", err)
-	}
-
-	req.Header.Set("Authorization", "Token "+os.Getenv("GITHUB_API_TOKEN")) // set GH auth header
-
-	response, err := client.Do(req)
-	if err != nil {
-		log.Fatalf("Error making get repo request: %+v", err.Error())
-	}
-	defer response.Body.Close()
-	parsedBody, _ := ioutil.ReadAll(response.Body)
-	return parsedBody
-}
-
-/*
-   Return formatted information about all my current public repos.
-   This uses the GitHub API
-*/
-func repos(writer http.ResponseWriter, r *http.Request) {
-	body := getRepos()
-	writer.Header().Set("Content-Type", "application/json")
-	writer.Header().Set("Content-Encoding", "gzip")
-
-	// construct custom repo struct for every repo returned from API and append to slice
-	repoStructSlice := []RepoStruct{}
-	js.ArrayEach(body, func(value []byte, dataType js.ValueType, offset int, err error) {
-		name, _ := js.GetString(value, "name")
-		desc, _ := js.GetString(value, "description")
-		url, _ := js.GetString(value, "html_url")
-		httpClone, _ := js.GetString(value, "clone_url")
-		sshClone, _ := js.GetString(value, "ssh_url")
-		stars, _ := js.GetInt(value, "stargazers_count")
-		forks, _ := js.GetInt(value, "forks_count")
-		language, _ := js.GetString(value, "language")
-		archived, _ := js.GetBoolean(value, "archived")
-
-		tmpRepo := RepoStruct{
-			Name:        name,
-			Description: desc,
-			URL:         url,
-			Stars:       int(stars),
-			Forks:       int(forks),
-			Language:    language,
-			Archived:    archived,
-			Clones: CloneSources{
-				HTTP: httpClone,
-				SSH:  sshClone,
-			},
-		}
-		repoStructSlice = append(repoStructSlice, tmpRepo)
-	})
-
-	// gzip and send
-	gz := gzip.NewWriter(writer)
-	json.NewEncoder(gz).Encode(repoStructSlice)
-	gz.Close()
+	var data struct{}
+	tmpl.Execute(writer, data)
 }
 
 /*
@@ -152,53 +86,16 @@ func repoStats(writer http.ResponseWriter, r *http.Request) {
 	gz.Close()
 }
 
-func listCollections(writer http.ResponseWriter, r *http.Request) {
-	writer.Header().Set("Content-Type", "application/json")
-	writer.Header().Set("Content-Encoding", "gzip")
-
+/*
+   Return a slice of S3 object pointers representing every object in the entire bucket
+*/
+func listBucket() []*s3.Object {
 	bucket := os.Getenv("AWS_BUCKET_NAME")
 	resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: &bucket})
 	if err != nil {
 		log.Fatalf("Error listing items: %+v", err.Error())
 	}
-
-	var collectionsSlice []Collection
-	// format each collection (folder i.e. has size of zero) and append to slice
-	for _, item := range resp.Contents {
-		var description string
-		if *item.Size == 0 {
-			if req, err := http.NewRequest("GET", formatPublicURL(strings.TrimSuffix(*item.Key, "/")+"/desc.json"), nil); err != nil {
-				log.Fatalf("Error generating collection description get request: %+v", err)
-			} else {
-				if response, err := client.Do(req); err != nil {
-					log.Fatalf("Error doing collection description get request: %+v", err)
-				} else {
-					defer response.Body.Close()
-					parsed, _ := ioutil.ReadAll(response.Body)
-					description, _ = js.GetString(parsed, "desc")
-				}
-			}
-
-			tempCollection := Collection{
-				Key:         strings.TrimSuffix(*item.Key, "/"),
-				Created:     item.LastModified.Format("January 02, 2006"),
-				Description: description,
-			}
-			collectionsSlice = append(collectionsSlice, tempCollection)
-			formatPublicURL(strings.TrimSuffix(*item.Key, "/"))
-		}
-	}
-
-	// gzip and send
-	gz := gzip.NewWriter(writer)
-	json.NewEncoder(gz).Encode(collectionsSlice)
-	gz.Close()
-
-}
-
-// plug in S3 info and a key to create a publicly accessible URL for an S3 resource
-func formatPublicURL(key string) string {
-	return "https://s3." + os.Getenv("AWS_REGION") + ".amazonaws.com/" + os.Getenv("AWS_BUCKET_NAME") + "/" + key
+	return resp.Contents
 }
 
 // do some setup before server spins up
@@ -227,15 +124,16 @@ func main() {
 	const base = "/api"
 	router := mux.NewRouter().StrictSlash(true) // create new Mux router
 
-	// root of server
+	// root of server - serve the landing page
 	router.HandleFunc("/", root).Methods("GET")
 
-	// GitHub routes
+	// GitHub API routes
 	router.HandleFunc(base+"/github/repos", repos).Methods("GET")
 	router.HandleFunc(base+"/github/repo-stats", repoStats).Methods("GET")
 
 	// photography routes
-	router.HandleFunc(base+"/photography/list-collections", listCollections).Methods("GET")
+	router.HandleFunc(base+"/photos/list-collections", listCollections).Methods("GET")
+	router.HandleFunc(base+"/photos/get-contents", getCollectionContents).Methods("GET")
 
 	// start server and listen on port
 	log.Println("Listening!")
