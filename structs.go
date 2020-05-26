@@ -31,4 +31,5 @@ type Collection struct {
 	Key         string `json:"key"`
 	Created     string `json:"date_created"`
 	Description string `json:"description"`
+	PreviewURL  string `json:"preview_url"`
 }

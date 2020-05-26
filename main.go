@@ -1,15 +1,12 @@
 package main
 
 import (
-	"compress/gzip"
-	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
-	js "github.com/buger/jsonparser"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 
@@ -28,8 +25,6 @@ var awsSesh *session.Session
 // S3 specific session
 var s3svc *s3.S3
 
-const gitHubRepoURL = "https://api.github.com/user/repos?visibility=public&affiliation=owner"
-
 /*
    Generate the root HTML for any requests that land there. // TODO this needs to be updated when I get a minute.
    At the minute it's just an (almost) direct port from my current backend.
@@ -40,62 +35,12 @@ func root(writer http.ResponseWriter, r *http.Request) {
 		log.Fatalf("Error creating template: %+v", err)
 	}
 
-	var data struct{}
+  data := struct{
+    HostedAt string
+  }{
+    HostedAt: "https://reecemercer-dev-backend.herokuapp.com/",
+  }
 	tmpl.Execute(writer, data)
-}
-
-/*
-   Provide stats about used languages and other such numbers from my public GitHub repositories
-*/
-func repoStats(writer http.ResponseWriter, r *http.Request) {
-	body := getRepos()
-	writer.Header().Set("Content-Type", "application/json")
-	writer.Header().Set("Content-Encoding", "gzip")
-
-	// map of: <language name: x><occurrences of x as dominant language in public repos>
-	langMap := make(map[string]int)
-
-	var totalForks, totalStars, total int
-
-	js.ArrayEach(body, func(value []byte, dataType js.ValueType, offset int, err error) {
-		language, _ := js.GetString(value, "language")
-		stars, _ := js.GetInt(value, "stargazers_count")
-		forks, _ := js.GetInt(value, "forks_count")
-
-		total++
-		totalForks += int(forks)
-		totalStars += int(stars)
-		// if key already seen, increment its value, else initialise its value to 1
-		if _, ok := langMap[language]; ok {
-			langMap[language]++
-		} else {
-			langMap[language] = 1
-		}
-	})
-
-	stats := GHStats{
-		LangUse:          langMap,
-		TotalPublicRepos: total,
-		TotalForks:       totalForks,
-		TotalStars:       totalStars,
-	}
-
-	// gzip and send
-	gz := gzip.NewWriter(writer)
-	json.NewEncoder(gz).Encode(stats)
-	gz.Close()
-}
-
-/*
-   Return a slice of S3 object pointers representing every object in the entire bucket
-*/
-func listBucket() []*s3.Object {
-	bucket := os.Getenv("AWS_BUCKET_NAME")
-	resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: &bucket})
-	if err != nil {
-		log.Fatalf("Error listing items: %+v", err.Error())
-	}
-	return resp.Contents
 }
 
 // do some setup before server spins up

@@ -11,6 +11,8 @@ import (
 	js "github.com/buger/jsonparser"
 )
 
+const gitHubRepoURL = "https://api.github.com/user/repos?visibility=public&affiliation=owner"
+
 /*
    Grab repo details from GitHub and parse reponse body
 */
@@ -72,5 +74,47 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 	// gzip and send
 	gz := gzip.NewWriter(writer)
 	json.NewEncoder(gz).Encode(repoStructSlice)
+	gz.Close()
+}
+
+/*
+   Provide stats about used languages and other such numbers from my public GitHub repositories
+*/
+func repoStats(writer http.ResponseWriter, r *http.Request) {
+	body := getRepos()
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Header().Set("Content-Encoding", "gzip")
+
+	// map of: <language name: x><occurrences of x as dominant language in public repos>
+	langMap := make(map[string]int)
+
+	var totalForks, totalStars, total int
+
+	js.ArrayEach(body, func(value []byte, dataType js.ValueType, offset int, err error) {
+		language, _ := js.GetString(value, "language")
+		stars, _ := js.GetInt(value, "stargazers_count")
+		forks, _ := js.GetInt(value, "forks_count")
+
+		total++
+		totalForks += int(forks)
+		totalStars += int(stars)
+		// if key already seen, increment its value, else initialise its value to 1
+		if _, ok := langMap[language]; ok {
+			langMap[language]++
+		} else {
+			langMap[language] = 1
+		}
+	})
+
+	stats := GHStats{
+		LangUse:          langMap,
+		TotalPublicRepos: total,
+		TotalForks:       totalForks,
+		TotalStars:       totalStars,
+	}
+
+	// gzip and send
+	gz := gzip.NewWriter(writer)
+	json.NewEncoder(gz).Encode(stats)
 	gz.Close()
 }
