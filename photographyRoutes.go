@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -77,11 +78,10 @@ func getCollectionContents(writer http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// if the collection doesn't actually exist
+		// if the object doesn't actually exist
 		if !match {
-			writer.Header().Set("Content-Type", "text/plain")
 			writer.WriteHeader(http.StatusNotFound)
-			fmt.Fprintf(writer, collectionName+" doesn't exist")
+			fmt.Fprintf(writer, html.EscapeString(collectionName) + " doesn't exist")
 			return
 		}
 

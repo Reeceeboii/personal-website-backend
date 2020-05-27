@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -35,15 +36,25 @@ func root(writer http.ResponseWriter, r *http.Request) {
 		log.Fatalf("Error creating template: %+v", err)
 	}
 
-  data := struct{
-    HostedAt string
-  }{
-    HostedAt: "https://reecemercer-dev-backend.herokuapp.com/",
-  }
+	// pass the remote URL to the templater to create visitable URLs on the root page
+	data := struct {
+		RemoteURL string
+	}{
+		RemoteURL: "https://reecemercer-dev-backend.herokuapp.com",
+	}
 	tmpl.Execute(writer, data)
 }
 
-// do some setup before server spins up
+/*
+  404 route
+*/
+func fourOhFour(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "./views/404.gohtml")
+}
+
+/*
+  Do some setup before server spins up
+*/
 func init() {
 	// load environment variables
 	if err := godotenv.Load(); err != nil {
@@ -65,9 +76,28 @@ func init() {
 	s3svc = s3.New(awsSesh)
 }
 
+// custom logger
+type logger struct{}
+
+func (writer logger) Write(bytes []byte) (int, error) {
+	return fmt.Print(time.Now().UTC().Format("Jan _2 15:04:05.000000"), " [LOG] ", string(bytes))
+}
+
+/*
+  Simply output a log of each incoming request
+*/
+func middlewareLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		log.Println("-> INCOMING", request.Method, "REQUEST TO", request.RequestURI)
+		// Call the next handler
+		next.ServeHTTP(writer, request)
+	})
+}
+
 func main() {
 	const base = "/api"
 	router := mux.NewRouter().StrictSlash(true) // create new Mux router
+	router.Use(middlewareLogger)
 
 	// root of server - serve the landing page
 	router.HandleFunc("/", root).Methods("GET")
@@ -79,6 +109,13 @@ func main() {
 	// photography routes
 	router.HandleFunc(base+"/photos/list-collections", listCollections).Methods("GET")
 	router.HandleFunc(base+"/photos/get-contents", getCollectionContents).Methods("GET")
+
+	// and for any non matching routes, send 404 response back
+	router.NotFoundHandler = http.HandlerFunc(fourOhFour)
+
+	// setup logger
+	log.SetFlags(0)
+	log.SetOutput(new(logger))
 
 	// start server and listen on port
 	log.Println("Listening!")

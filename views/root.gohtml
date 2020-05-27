@@ -9,13 +9,14 @@
   <body>
 
     <div class="jumbotron jumbotron-fluid">
-      <div class="container">
-          <h1 class="display-4">reecemercer.dev backend API</h1>
-          <p class="lead">You have reached the root endpoint (<code>/</code>). Please see below for a full list of all available endpoints.</p>
-          <figure class="figure">
-            <a href="https://app.netlify.com/sites/practical-knuth-a08923/deploys"><img src="https://api.netlify.com/api/v1/badges/05ec1ea4-d953-4d0c-9aa2-a611fc5cc3fe/deploy-status" /></a>
-            <figcaption class="figure-caption text-left"><a href="https://reecemercer.dev" target="_blank" rel="noopener noreferrer">reecemercer.dev</a></figcaption>
-          </figure>
+        <div class="container">
+            <h1 class="display-4">reecemercer.dev backend API</h1>
+            <p class="lead">You have reached the root endpoint (<code>/</code>). Please see below for a full list of all available endpoints.</p>
+            <p class="lead">Click any endpoint links to visit them directly.</p>
+            <figure class="figure">
+                <a href="https://app.netlify.com/sites/practical-knuth-a08923/deploys"><img src="https://api.netlify.com/api/v1/badges/05ec1ea4-d953-4d0c-9aa2-a611fc5cc3fe/deploy-status" /></a>
+                <figcaption class="figure-caption text-left"><a href="https://reecemercer.dev" target="_blank" rel="noopener noreferrer">reecemercer.dev</a></figcaption>
+            </figure>
         </div>
       </div>
     <div class="row mb-5" style="width:98vw; margin:auto">
@@ -30,11 +31,11 @@
                   </tr>
                 </thead>
                 <tbody>
-                <!--
+                
                   <tr>
-                    <th scope="row">get-repos-from-db</th>
-                    <td><a href="https://rm-backend-services.herokuapp.com/myRepoAPI/get-repos-from-db"><code>/myRepoAPI/get-repos-from-db/</code></td>
+                    <td><a href='{{.RemoteURL}}/api/github/repos'><code>/api/github/repos</code></td>
                     <td><code>GET</code></td>
+                    <td>A formatted array of all my currently public GitHub repositories</td>
                   </tr>
                   <tr>
                     <th scope="row">language-stats</th>
@@ -42,7 +43,7 @@
                     <td><code>GET</code></td>
                   </tr>
                 </tbody>
-                -->
+            
               </table>
         </div>
         <div class="col-md">
