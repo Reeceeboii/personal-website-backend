@@ -50,8 +50,8 @@ func listCollections(writer http.ResponseWriter, r *http.Request) {
 
 	// gzip and send
 	gz := gzip.NewWriter(writer)
-	json.NewEncoder(gz).Encode(collectionsSlice)
-	gz.Close()
+  defer gz.Close()
+  json.NewEncoder(gz).Encode(collectionsSlice)
 }
 
 /*
@@ -117,9 +117,9 @@ func getCollectionContents(writer http.ResponseWriter, r *http.Request) {
 			item += 2
 		}
 		// gzip and send
-		gz := gzip.NewWriter(writer)
+    gz := gzip.NewWriter(writer)
+    defer gz.Close()
 		json.NewEncoder(gz).Encode(pairsForCollection)
-		gz.Close()
 	} else {
 		writer.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(writer, "I have no idea what you want me to do.")

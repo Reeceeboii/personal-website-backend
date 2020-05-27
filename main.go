@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"fmt"
 	"html/template"
 	"log"
@@ -31,6 +32,8 @@ var s3svc *s3.S3
    At the minute it's just an (almost) direct port from my current backend.
 */
 func root(writer http.ResponseWriter, r *http.Request) {
+	writer.Header().Add("Content-Type", "text/html")
+	writer.Header().Set("Content-Encoding", "gzip")
 	tmpl, err := template.ParseFiles("./views/root.gohtml")
 	if err != nil {
 		log.Fatalf("Error creating template: %+v", err)
@@ -42,7 +45,13 @@ func root(writer http.ResponseWriter, r *http.Request) {
 	}{
 		RemoteURL: "https://reecemercer-dev-backend.herokuapp.com",
 	}
-	tmpl.Execute(writer, data)
+
+	// setup gzip
+	gz := gzip.NewWriter(writer)
+	defer gz.Close()
+
+	// generate templated HTML and send
+	tmpl.Execute(gz, data)
 }
 
 /*

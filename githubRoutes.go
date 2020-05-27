@@ -73,8 +73,8 @@ func repos(writer http.ResponseWriter, r *http.Request) {
 
 	// gzip and send
 	gz := gzip.NewWriter(writer)
-	json.NewEncoder(gz).Encode(repoStructSlice)
-	gz.Close()
+  defer gz.Close()
+  json.NewEncoder(gz).Encode(repoStructSlice)
 }
 
 /*
@@ -115,6 +115,6 @@ func repoStats(writer http.ResponseWriter, r *http.Request) {
 
 	// gzip and send
 	gz := gzip.NewWriter(writer)
-	json.NewEncoder(gz).Encode(stats)
-	gz.Close()
+  defer gz.Close()
+  json.NewEncoder(gz).Encode(stats)
 }
