@@ -7,7 +7,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
   </head>
   <body>
-
     <div class="jumbotron jumbotron-fluid">
         <div class="container">
             <h1 class="display-4">reecemercer.dev backend API</h1>
@@ -27,23 +26,24 @@
                   <tr>
                     <th scope="col">URL</th>
                     <th scope="col">Expected request</th>
+                    <th scope="col">Parameters</th>
                     <th scope="col">Expected response</th>
                   </tr>
                 </thead>
                 <tbody>
-                
                   <tr>
                     <td><a href='{{.RemoteURL}}/api/github/repos'><code>/api/github/repos</code></td>
                     <td><code>GET</code></td>
+                    <td>None</td>
                     <td>A formatted array of all my currently public GitHub repositories</td>
                   </tr>
                   <tr>
-                    <th scope="row">language-stats</th>
-                    <td><a href="https://rm-backend-services.herokuapp.com/myRepoAPI/language-stats"><code>/myRepoAPI/language-stats/</code></td>
+                    <td><a href='{{.RemoteURL}}/api/github/repo-stats'><code>/api/github/repo-stats</code></td>
                     <td><code>GET</code></td>
+                    <td>None</td>
+                    <td>Some cumulative statistics about my public GitHub repositories</td>
                   </tr>
                 </tbody>
-            
               </table>
         </div>
         <div class="col-md">
@@ -53,44 +53,40 @@
                   <tr>
                     <th scope="col">URL</th>
                     <th scope="col">Expected request</th>
+                    <th scope="col">Parameters</th>
                     <th scope="col">Expected response</th>
                   </tr>
                 </thead>
                 <tbody>
-                <!--
                   <tr>
-                    <th scope="row">splash-image</th>
-                    <td><a href="https://rm-backend-services.herokuapp.com/photography/splash-image"><code>/photography/splash-image/</code></a></td>
+                    <td><a href='{{.RemoteURL}}/api/photos/list-collections'><code>/api/photos/list-collections</code></a></td>
                     <td><code>GET</code></td>
+                    <td>None</td>
+                    <td>List of collections, along with descriptions and preview image links</td>
                   </tr>
                   <tr>
-                    <th scope="row">collection-names</th>
-                    <td><a href="https://rm-backend-services.herokuapp.com/photography/collection-names"><code>/photography/collection-names/</code></a></td>
+                    <td><a href='{{.RemoteURL}}/api/photos/get-contents'><code>/api/photos/get-contents</code></a></td>
                     <td><code>GET</code></td>
+                    <td>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Name</th>
+                                    <th scope="col">Example</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>c</code></td>
+                                    <td><code>Sunsets</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                    <td>All image links for a given collection. Takes one parameter, c, as the name of the collection to list. For a list of available collections, visit <code><a href='{{.RemoteURL}}/api/photos/list-collections'>/api/photos/list-collections</a></code> first</td>
                   </tr>
-                  <tr>
-                    <th scope="row">collection-description</th>
-                    <td><a href="https://rm-backend-services.herokuapp.com/photography/collection-description/Sunsets"><code>/photography/collection-decription/:key</code></a></td>
-                    <td><code>GET</code> with a key variable. The URL uses <code>Sunsets</code> as an example.</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">collection-contents</th>
-                    <td><a href="https://rm-backend-services.herokuapp.com/photography/collection-contents/Sunsets"><code>/photography/collection-contents/:key</code></a></td>
-                    <td><code>GET</code> with a key variable. The URL uses <code>Sunsets</code> as an example.</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">collection-preview</th>
-                    <td><a href="https://rm-backend-services.herokuapp.com/photography/collection-preview/Sunsets"><code>/photography/collection-preview/:key</code></a></td>
-                    <td><code>GET</code> with a key variable. The URL uses <code>Sunsets</code> as an example.</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">S3-server-stats</th>
-                    <td><a href="https://rm-backend-services.herokuapp.com/photography/S3-server-stats"><code>/photography/S3-server-stats</code></a></td>
-                    <td><code>GET</code></td>
-                  </tr>
-                  -->            
                 </tbody>
-              </table>
+            </table>
         </div>
     </div>
   </body>
