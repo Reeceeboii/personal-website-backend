@@ -33,3 +33,10 @@ type Collection struct {
 	Description string `json:"description"`
 	PreviewURL  string `json:"preview_url"`
 }
+
+// ImageObject - holds the info about one individual image
+type ImageObject struct {
+	CompressedURL string `json:"compressed_url"`
+	FullURL       string `json:"full_url"`
+	FullResMIB    string `json:"full_res_file_size_mib"`
+}

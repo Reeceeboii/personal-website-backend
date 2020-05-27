@@ -59,13 +59,76 @@ func listCollections(writer http.ResponseWriter, r *http.Request) {
 */
 func getCollectionContents(writer http.ResponseWriter, r *http.Request) {
 	if collectionName := r.URL.Query().Get("c"); collectionName != "" {
-		fmt.Println(collectionName)
+		bucket := os.Getenv("AWS_BUCKET_NAME")
+
+		// does the queried collection name actually exist in the bucket?
+		match := false
+		if resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{
+			Bucket: &bucket,
+		}); err != nil {
+			log.Fatalf("Error getting objects for collection: %+v", err.Error())
+		} else {
+			for _, item := range resp.Contents {
+				if *item.Size == 0 {
+					if collectionName+"/" == *item.Key {
+						match = true
+					}
+				}
+			}
+		}
+
+		// if the collection doesn't actually exist
+		if !match {
+			writer.Header().Set("Content-Type", "text/plain")
+			writer.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(writer, collectionName+" doesn't exist")
+			return
+		}
+
+		// once we're here, we're certain that the collection does exist, and that means we're fine
+		// to begin querying it for objects
+		writer.Header().Set("Content-Type", "application/json")
+		writer.Header().Set("Content-Encoding", "gzip")
+		prefix := collectionName + "/_"
+		resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{
+			Bucket: &bucket,
+			Prefix: &prefix,
+		})
+		if err != nil {
+			log.Fatalf("Error getting objects for collection: %+v", err.Error())
+		}
+		// https://docs.aws.amazon.com/AmazonS3/latest/dev/ListingKeysUsingAPIs.html
+		// since keys are always listed in UTF8 binary order I can just take them together
+		// and am essentially guaranteed their correctness as pairs. This saves all the string
+		// operations that I implemented in my previous backend and is therefore inherently a lot faster
+		item := 0
+		var pairsForCollection []ImageObject
+		for item < len(resp.Contents)-1 {
+			var size float64
+			// cast file size (bytes as int64) to float 64, and divide by 1024 twice to get KiB and MiB
+			size = float64(*resp.Contents[item+1].Size)
+			size /= 1024
+			size /= 1024
+			pairsForCollection = append(pairsForCollection, ImageObject{
+				CompressedURL: formatPublicURL(*resp.Contents[item].Key),
+				FullURL:       formatPublicURL(*resp.Contents[item+1].Key),
+				FullResMIB:    fmt.Sprintf("%.2f", size), // round off to 2 d.p
+			})
+			item += 2
+		}
+		// gzip and send
+		gz := gzip.NewWriter(writer)
+		json.NewEncoder(gz).Encode(pairsForCollection)
+		gz.Close()
+	} else {
+		writer.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(writer, "I have no idea what you want me to do.")
 	}
 }
 
 // plug in S3 info and a key to create a publicly accessible URL for an S3 resource
 func formatPublicURL(key string) string {
-	return strings.ReplaceAll("https://s3." + os.Getenv("AWS_REGION") + ".amazonaws.com/" + os.Getenv("AWS_BUCKET_NAME") + "/" + key, " ", "+")
+	return strings.ReplaceAll("https://s3."+os.Getenv("AWS_REGION")+".amazonaws.com/"+os.Getenv("AWS_BUCKET_NAME")+"/"+key, " ", "+")
 }
 
 /*
@@ -73,7 +136,9 @@ func formatPublicURL(key string) string {
 */
 func listBucket() []*s3.Object {
 	bucket := os.Getenv("AWS_BUCKET_NAME")
-	resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: &bucket})
+	resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{
+		Bucket: &bucket,
+	})
 	if err != nil {
 		log.Fatalf("Error listing items: %+v", err.Error())
 	}
@@ -91,7 +156,10 @@ func getCollectionPreviewLink(collectionName string) string {
 
 	prefix := collectionName + "_preview_"
 	bucket := os.Getenv("AWS_BUCKET_NAME")
-	resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: &bucket, Prefix: &prefix})
+	resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{
+		Bucket: &bucket,
+		Prefix: &prefix,
+	})
 	if err != nil {
 		log.Fatalf("Error listing items: %+v", err.Error())
 	} else {
