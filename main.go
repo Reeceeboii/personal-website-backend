@@ -103,10 +103,27 @@ func middlewareLogger(next http.Handler) http.Handler {
 	})
 }
 
+/*
+  Enable CORS headers on all responses
+*/
+func middlewareCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		// insert CORS header into ResponseWriter
+		writer.Header().Set("Access-Control-Allow-Origin", "*")
+		// Call the next handler
+		next.ServeHTTP(writer, request)
+	})
+}
+
 func main() {
 	const base = "/api"
-	router := mux.NewRouter().StrictSlash(true) // create new Mux router
+
+	// create new Mux router
+	router := mux.NewRouter().StrictSlash(true)
+
+	//apply logging and CORS middleware
 	router.Use(middlewareLogger)
+	router.Use(middlewareCORS)
 
 	// root of server - serve the landing page
 	router.HandleFunc("/", root).Methods("GET")
