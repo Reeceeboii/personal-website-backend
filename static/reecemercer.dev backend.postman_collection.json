@@ -1,0 +1,121 @@
+{
+	"info": {
+		"_postman_id": "9fcf6ea4-50ce-4e5d-9cdb-edbc5b7bbcaa",
+		"name": "reecemercer.dev backend",
+		"description": "A collection of API requests to test my backend via Postman",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "GitHub API",
+			"item": [
+				{
+					"name": "All repositories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://reecemercer-dev-backend.herokuapp.com/api/github/repos",
+							"protocol": "https",
+							"host": [
+								"reecemercer-dev-backend",
+								"herokuapp",
+								"com"
+							],
+							"path": [
+								"api",
+								"github",
+								"repos"
+							]
+						},
+						"description": "Get all GitHUb repositories"
+					},
+					"response": []
+				},
+				{
+					"name": "Repo stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://reecemercer-dev-backend.herokuapp.com/api/github/repo-stats",
+							"protocol": "https",
+							"host": [
+								"reecemercer-dev-backend",
+								"herokuapp",
+								"com"
+							],
+							"path": [
+								"api",
+								"github",
+								"repo-stats"
+							]
+						},
+						"description": "Get some repo statistics that are calculated using data from GitHub"
+					},
+					"response": []
+				}
+			],
+			"protocolProfileBehavior": {}
+		},
+		{
+			"name": "Photography API",
+			"item": [
+				{
+					"name": "List collections",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://reecemercer-dev-backend.herokuapp.com/api/photos/list-collections",
+							"protocol": "https",
+							"host": [
+								"reecemercer-dev-backend",
+								"herokuapp",
+								"com"
+							],
+							"path": [
+								"api",
+								"photos",
+								"list-collections"
+							]
+						},
+						"description": "Gets a list of all photography collections"
+					},
+					"response": []
+				},
+				{
+					"name": "Get collection contents",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://reecemercer-dev-backend.herokuapp.com/api/photos/get-contents?c=Sunsets",
+							"protocol": "https",
+							"host": [
+								"reecemercer-dev-backend",
+								"herokuapp",
+								"com"
+							],
+							"path": [
+								"api",
+								"photos",
+								"get-contents"
+							],
+							"query": [
+								{
+									"key": "c",
+									"value": "Sunsets"
+								}
+							]
+						},
+						"description": "Get all images from a collection"
+					},
+					"response": []
+				}
+			],
+			"protocolProfileBehavior": {}
+		}
+	],
+	"protocolProfileBehavior": {}
+}
