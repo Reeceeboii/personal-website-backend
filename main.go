@@ -136,6 +136,10 @@ func main() {
 	router.HandleFunc(base+"/photos/list-collections", listCollections).Methods("GET")
 	router.HandleFunc(base+"/photos/get-contents", getCollectionContents).Methods("GET")
 
+	// static file route
+	s := http.StripPrefix("/static/", http.FileServer(http.Dir("./static/")))
+	router.PathPrefix("/static/").Handler(s)
+
 	// and for any non matching routes, send 404 response back
 	router.NotFoundHandler = http.HandlerFunc(fourOhFour)
 
