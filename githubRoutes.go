@@ -16,8 +16,6 @@ import (
 
 const gitHubRepoURL = "https://api.github.com/user/repos?visibility=public&affiliation=owner"
 
-//const githubRefreshTImeout = strconv.Atoi(Getenv("GITHUB_REFRESH_SECONDS"))
-
 // concurrency safe mutex lock wrapper around a slice of RepoStruct instances
 type MutexRepositoryWrapper struct {
 	mutex        sync.Mutex
