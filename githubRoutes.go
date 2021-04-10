@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"sync"
 	"time"
 )
@@ -57,6 +58,14 @@ func (mutexRepos *MutexRepositoryWrapper) updateData(force bool) {
 		log.Println("Update complete!")
 	}
 
+	// nested function used for sorting the data once it has been retrieved
+	sortReposByStars := func(mutexRepos *MutexRepositoryWrapper) {
+		log.Println("sorting!")
+		sort.Slice(mutexRepos.repositories[:], func(i, j int) bool {
+			return mutexRepos.repositories[i].Stars > mutexRepos.repositories[j].Stars
+		})
+	}
+
 	// read out the refresh rate from the environment
 	refreshRate, err := time.ParseDuration(fmt.Sprintf("%ss", os.Getenv("GITHUB_REFRESH_SECONDS")))
 	if err != nil {
@@ -68,15 +77,18 @@ func (mutexRepos *MutexRepositoryWrapper) updateData(force bool) {
 		log.Println("GITHUB UPDATE BEING FORCED")
 		mutexRepos.mutex.Lock()
 		update(mutexRepos)
+		sortReposByStars(mutexRepos)
 		mutexRepos.mutex.Unlock()
 	} else {
 		// for every tick in <GITHUB_REFRESH_SECONDS>, lock the mutex and update the data
 		for range time.Tick(refreshRate) {
 			mutexRepos.mutex.Lock()
 			update(mutexRepos)
+			sortReposByStars(mutexRepos)
 			mutexRepos.mutex.Unlock()
 		}
 	}
+
 }
 
 // lock the mutex, read out the repositories and unlock mutex after returning data
@@ -133,7 +145,10 @@ func repoStats(writer http.ResponseWriter, r *http.Request) {
 		if _, ok := langMap[repo.Language]; ok {
 			langMap[repo.Language]++
 		} else {
-			langMap[repo.Language] = 1
+			// exclude repositories with no linguist languages
+			if repo.Language != "" {
+				langMap[repo.Language] = 1
+			}
 		}
 	}
 
