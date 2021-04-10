@@ -1,11 +1,11 @@
 module github.com/Reeceeboii/personal-website-backend
 
-go 1.15
+go 1.16
 
 require (
-	github.com/aws/aws-sdk-go v1.25.14-0.20200522181256-9d8e9728d6da
-	github.com/buger/jsonparser v1.0.0
-	github.com/gorilla/mux v1.7.5-0.20200517040254-948bec34b516
-	github.com/jmespath/go-jmespath v0.3.1-0.20200310193758-2437e8417af5 // indirect
+	github.com/aws/aws-sdk-go v1.38.17
+	github.com/buger/jsonparser v1.1.1
+	github.com/gorilla/mux v1.8.0
 	github.com/joho/godotenv v1.3.1-0.20200301204615-d6ee6871f21d
+	github.com/stretchr/testify v1.5.1 // indirect
 )

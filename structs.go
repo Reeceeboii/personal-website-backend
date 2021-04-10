@@ -2,20 +2,13 @@ package main
 
 // RepoStruct - struct for storing repository data retrieved from API requests
 type RepoStruct struct {
-	Name        string       `json:"name"`
-	Description string       `json:"desc"`
-	URL         string       `json:"url"`
-	Stars       int          `json:"stars"`
-	Forks       int          `json:"forks"`
-	Language    string       `json:"lang"`
-	Archived    bool         `json:"archived"`
-	Clones      CloneSources `json:"clones"`
-}
-
-// CloneSources - storing the different ways the repositories can be cloned locally
-type CloneSources struct {
-	HTTP string `json:"http_clone"`
-	SSH  string `json:"ssh_clone"`
+	Name        string `json:"name"`
+	Description string `json:"desc"`
+	URL         string `json:"url"`
+	Stars       int    `json:"stars"`
+	Forks       int    `json:"forks"`
+	Language    string `json:"lang"`
+	Archived    bool   `json:"archived"`
 }
 
 // GHStats - storing stats about my currently public GitHub repositories

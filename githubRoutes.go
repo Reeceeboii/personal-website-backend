@@ -3,19 +3,90 @@ package main
 import (
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
+	js "github.com/buger/jsonparser"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-
-	js "github.com/buger/jsonparser"
+	"sync"
+	"time"
 )
 
 const gitHubRepoURL = "https://api.github.com/user/repos?visibility=public&affiliation=owner"
 
-/*
-   Grab repo details from GitHub and parse reponse body
-*/
+//const githubRefreshTImeout = strconv.Atoi(Getenv("GITHUB_REFRESH_SECONDS"))
+
+// concurrency safe mutex lock wrapper around a slice of RepoStruct instances
+type MutexRepositoryWrapper struct {
+	mutex        sync.Mutex
+	repositories []RepoStruct
+}
+
+var mutexData = MutexRepositoryWrapper{}
+
+// lock the mutex, update the repositories slice, unlock the mutex
+func (mutexRepos *MutexRepositoryWrapper) updateData(force bool) {
+
+	// nested function used to make the API call
+	update := func(mutexRepos *MutexRepositoryWrapper) {
+		log.Println("Updating data from GitHub...")
+		body := getRepos()
+		mutexRepos.repositories = []RepoStruct{}
+
+		js.ArrayEach(body, func(value []byte, dataType js.ValueType, offset int, err error) {
+			name, _ := js.GetString(value, "name")
+			desc, _ := js.GetString(value, "description")
+			url, _ := js.GetString(value, "html_url")
+			stars, _ := js.GetInt(value, "stargazers_count")
+			forks, _ := js.GetInt(value, "forks_count")
+			language, _ := js.GetString(value, "language")
+			archived, _ := js.GetBoolean(value, "archived")
+
+			tmpRepo := RepoStruct{
+				Name:        name,
+				Description: desc,
+				URL:         url,
+				Stars:       int(stars), // GetInt provides int64
+				Forks:       int(forks),
+				Language:    language,
+				Archived:    archived,
+			}
+			mutexRepos.repositories = append(mutexRepos.repositories, tmpRepo)
+		})
+		log.Println("Update complete!")
+	}
+
+	// read out the refresh rate from the environment
+	refreshRate, err := time.ParseDuration(fmt.Sprintf("%ss", os.Getenv("GITHUB_REFRESH_SECONDS")))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// if the function is being forced, we do not need to wait for the ticker
+	if force {
+		log.Println("GITHUB UPDATE BEING FORCED")
+		mutexRepos.mutex.Lock()
+		update(mutexRepos)
+		mutexRepos.mutex.Unlock()
+	} else {
+		// for every tick in <GITHUB_REFRESH_SECONDS>, lock the mutex and update the data
+		for range time.Tick(refreshRate) {
+			mutexRepos.mutex.Lock()
+			update(mutexRepos)
+			mutexRepos.mutex.Unlock()
+		}
+	}
+}
+
+// lock the mutex, read out the repositories and unlock mutex after returning data
+func (mutexRepos *MutexRepositoryWrapper) getRepositories() []RepoStruct {
+	mutexRepos.mutex.Lock()
+	defer mutexRepos.mutex.Unlock()
+	return mutexRepos.repositories
+}
+
+// Grab repo details from GitHub and parse response body
 func getRepos() (body []byte) {
 	req, err := http.NewRequest("GET", gitHubRepoURL, nil)
 	if err != nil {
@@ -33,55 +104,19 @@ func getRepos() (body []byte) {
 	return parsedBody
 }
 
-/*
-   Return formatted information about all my current public repos.
-   This uses the GitHub API
-*/
+// Return formatted information about all my current public repos.
 func repos(writer http.ResponseWriter, r *http.Request) {
-	body := getRepos()
 	writer.Header().Set("Content-Type", "application/json")
 	writer.Header().Set("Content-Encoding", "gzip")
 
-	// construct custom repo struct for every repo returned from API and append to slice
-	repoStructSlice := []RepoStruct{}
-	js.ArrayEach(body, func(value []byte, dataType js.ValueType, offset int, err error) {
-		name, _ := js.GetString(value, "name")
-		desc, _ := js.GetString(value, "description")
-		url, _ := js.GetString(value, "html_url")
-		httpClone, _ := js.GetString(value, "clone_url")
-		sshClone, _ := js.GetString(value, "ssh_url")
-		stars, _ := js.GetInt(value, "stargazers_count")
-		forks, _ := js.GetInt(value, "forks_count")
-		language, _ := js.GetString(value, "language")
-		archived, _ := js.GetBoolean(value, "archived")
-
-		tmpRepo := RepoStruct{
-			Name:        name,
-			Description: desc,
-			URL:         url,
-			Stars:       int(stars), // GetInt provides int64
-			Forks:       int(forks),
-			Language:    language,
-			Archived:    archived,
-			Clones: CloneSources{
-				HTTP: httpClone,
-				SSH:  sshClone,
-			},
-		}
-		repoStructSlice = append(repoStructSlice, tmpRepo)
-	})
-
 	// gzip and send
 	gz := gzip.NewWriter(writer)
-  defer gz.Close()
-  json.NewEncoder(gz).Encode(repoStructSlice)
+	defer gz.Close()
+	json.NewEncoder(gz).Encode(mutexData.getRepositories())
 }
 
-/*
-   Provide stats about used languages and other such numbers from my public GitHub repositories
-*/
+// Provide stats about used languages and other such numbers from my public GitHub repositories
 func repoStats(writer http.ResponseWriter, r *http.Request) {
-	body := getRepos()
 	writer.Header().Set("Content-Type", "application/json")
 	writer.Header().Set("Content-Encoding", "gzip")
 
@@ -90,21 +125,17 @@ func repoStats(writer http.ResponseWriter, r *http.Request) {
 
 	var totalForks, totalStars, total int
 
-	js.ArrayEach(body, func(value []byte, dataType js.ValueType, offset int, err error) {
-		language, _ := js.GetString(value, "language")
-		stars, _ := js.GetInt(value, "stargazers_count")
-		forks, _ := js.GetInt(value, "forks_count")
-
+	for _, repo := range mutexData.getRepositories() {
 		total++
-		totalForks += int(forks)
-		totalStars += int(stars)
+		totalForks += repo.Forks
+		totalStars += repo.Stars
 		// if key already seen, increment its value, else initialise its value to 1
-		if _, ok := langMap[language]; ok {
-			langMap[language]++
+		if _, ok := langMap[repo.Language]; ok {
+			langMap[repo.Language]++
 		} else {
-			langMap[language] = 1
+			langMap[repo.Language] = 1
 		}
-	})
+	}
 
 	stats := GHStats{
 		LangUse:          langMap,
@@ -115,6 +146,6 @@ func repoStats(writer http.ResponseWriter, r *http.Request) {
 
 	// gzip and send
 	gz := gzip.NewWriter(writer)
-  defer gz.Close()
-  json.NewEncoder(gz).Encode(stats)
+	defer gz.Close()
+	json.NewEncoder(gz).Encode(stats)
 }
