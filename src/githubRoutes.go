@@ -16,6 +16,25 @@ import (
 
 const gitHubRepoURL = "https://api.github.com/user/repos?visibility=public&affiliation=owner"
 
+// RepoStruct - struct for storing repository data retrieved from API requests
+type RepoStruct struct {
+	Name        string `json:"name"`
+	Description string `json:"desc"`
+	URL         string `json:"url"`
+	Stars       int    `json:"stars"`
+	Forks       int    `json:"forks"`
+	Language    string `json:"lang"`
+	Archived    bool   `json:"archived"`
+}
+
+// GHStats - storing stats about my currently public GitHub repositories
+type GHStats struct {
+	LangUse          map[string]int `json:"language_use"`
+	TotalPublicRepos int            `json:"total_repos"`
+	TotalStars       int            `json:"total_stars"`
+	TotalForks       int            `json:"total_forks"`
+}
+
 // concurrency safe mutex lock wrapper around a slice of RepoStruct instances
 type MutexRepositoryWrapper struct {
 	mutex        sync.Mutex

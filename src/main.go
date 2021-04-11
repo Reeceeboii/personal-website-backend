@@ -17,6 +17,27 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
+// StaticInformation - holds various pieces of non-changing data about the current server release
+type StaticInformation struct {
+	GoRuntime      string
+	AWSSDKName     string
+	AWSSDKVersion  string
+	ServerBootTime time.Time
+}
+
+// CumulativeServerInformation - holds pieces of data that change as time goes on
+type CumulativeServerInformation struct {
+	callsToGitHubAPI         uint64
+	getReposHits             uint64
+	getRepoStatsHits         uint64
+	listCollectionHits       uint64
+	getCollectionContentHits uint64
+}
+
+// set up the server's data structs
+var StaticInfo = StaticInformation{}
+var CumulativeInfo = CumulativeServerInformation{}
+
 // HTTP client for outbound requests
 var client *http.Client
 
@@ -87,7 +108,10 @@ func middlewareCORS(next http.Handler) http.Handler {
 // middleware to handle cache control headers on server responses
 func middlewareCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Cache-Control", fmt.Sprintf("%f", time.Hour.Seconds()))
+		// insert cache control header into ResponseWriter
+		writer.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d", int(time.Hour.Seconds())))
+		// call the next handler
+		next.ServeHTTP(writer, request)
 	})
 }
 
@@ -100,6 +124,7 @@ func main() {
 	//apply logging, CORS and caching middleware
 	router.Use(middlewareLogger)
 	router.Use(middlewareCORS)
+	router.Use(middlewareCache)
 
 	// root of server
 	router.HandleFunc("/", root).Methods("GET")
@@ -119,12 +144,27 @@ func main() {
 	log.SetFlags(0)
 	log.SetOutput(new(logger))
 
-	// log some details when the server first spins up
-	log.Printf("Go runtime version: %s\n", runtime.Version())
-	log.Printf("AWS SDK: %s %s \n", aws.SDKName, aws.SDKVersion)
-	log.Printf("PORT: %s\n", os.Getenv("PORT"))
-	log.Printf("GITHUB_REFRESH_SECONDS: %s\n", os.Getenv("GITHUB_REFRESH_SECONDS"))
-	log.Printf("GO_ENV: %s\n", os.Getenv("GO_ENV"))
+	// store some of the important data about the server when it first starts up
+	StaticInfo.GoRuntime = runtime.Version()
+	StaticInfo.AWSSDKName = aws.SDKName
+	StaticInfo.AWSSDKVersion = aws.SDKVersion
+	StaticInfo.ServerBootTime = time.Now()
+
+	// initialise the server to get it ready to send emails
+	InitEmailData()
+	// send the first server boot email out
+	SendServerBootEmail()
+	// start the periodic outbound emails
+	go EmailJob()
+
+	if os.Getenv("GO_ENV") == "development" {
+		// get the executable's current working directory
+		workingDirectory, err := os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("Working dir: %s\n", workingDirectory)
+	}
 
 	/*
 	  Start periodic updates from GitHub. We can force one starter update through when the server

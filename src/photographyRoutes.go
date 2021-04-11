@@ -15,9 +15,22 @@ import (
 	js "github.com/buger/jsonparser"
 )
 
-/*
-   Returns the names of all collections, their creation dates and their descriptions
-*/
+// Collection - struct for storing data about photo collections
+type Collection struct {
+	Key         string `json:"key"`
+	Created     string `json:"date_created"`
+	Description string `json:"description"`
+	PreviewURL  string `json:"preview_url"`
+}
+
+// ImageObject - holds the info about one individual image
+type ImageObject struct {
+	CompressedURL string `json:"compressed_url"`
+	FullURL       string `json:"full_url"`
+	FullResMIB    string `json:"full_res_file_size_mib"`
+}
+
+// Returns the names of all collections, their creation dates and their descriptions
 func listCollections(writer http.ResponseWriter, r *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.Header().Set("Content-Encoding", "gzip")
@@ -50,8 +63,8 @@ func listCollections(writer http.ResponseWriter, r *http.Request) {
 
 	// gzip and send
 	gz := gzip.NewWriter(writer)
-  defer gz.Close()
-  json.NewEncoder(gz).Encode(collectionsSlice)
+	defer gz.Close()
+	json.NewEncoder(gz).Encode(collectionsSlice)
 }
 
 /*
@@ -81,7 +94,7 @@ func getCollectionContents(writer http.ResponseWriter, r *http.Request) {
 		// if the object doesn't actually exist
 		if !match {
 			writer.WriteHeader(http.StatusNotFound)
-			fmt.Fprintf(writer, html.EscapeString(collectionName) + " doesn't exist")
+			fmt.Fprintf(writer, html.EscapeString(collectionName)+" doesn't exist")
 			return
 		}
 
@@ -117,8 +130,8 @@ func getCollectionContents(writer http.ResponseWriter, r *http.Request) {
 			item += 2
 		}
 		// gzip and send
-    gz := gzip.NewWriter(writer)
-    defer gz.Close()
+		gz := gzip.NewWriter(writer)
+		defer gz.Close()
 		json.NewEncoder(gz).Encode(pairsForCollection)
 	} else {
 		writer.WriteHeader(http.StatusNotFound)
@@ -131,9 +144,7 @@ func formatPublicURL(key string) string {
 	return strings.ReplaceAll("https://s3."+os.Getenv("AWS_REGION")+".amazonaws.com/"+os.Getenv("AWS_BUCKET_NAME")+"/"+key, " ", "+")
 }
 
-/*
-   Return a slice of S3 object pointers representing every object in the entire bucket
-*/
+// Return a slice of S3 object pointers representing every object in the entire bucket
 func listBucket() []*s3.Object {
 	bucket := os.Getenv("AWS_BUCKET_NAME")
 	resp, err := s3svc.ListObjectsV2(&s3.ListObjectsV2Input{
@@ -145,9 +156,7 @@ func listBucket() []*s3.Object {
 	return resp.Contents
 }
 
-/*
-  Given the name of a photo collection (S3 folder object), return the URL for its preview image.
-*/
+// Given the name of a photo collection (S3 folder object), return the URL for its preview image.
 func getCollectionPreviewLink(collectionName string) string {
 	// make sure folder has appended slash
 	if !strings.Contains(collectionName, "/") {
