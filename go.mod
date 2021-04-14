@@ -7,5 +7,5 @@ require (
 	github.com/buger/jsonparser v1.1.1
 	github.com/gorilla/mux v1.8.0
 	github.com/joho/godotenv v1.3.1-0.20200301204615-d6ee6871f21d
-	github.com/stretchr/testify v1.5.1 // indirect
+	go.mongodb.org/mongo-driver v1.5.1 // indirect
 )
